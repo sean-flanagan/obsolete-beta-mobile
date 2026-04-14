@@ -109,9 +109,9 @@ export class ObsoleteGame {
     this.loadAct(0);
     this.camera.x = 0;
     this.camera.y = 0;
-    this.setDialogue("Scrap Heap", "Press Enter to boot up.", "laptop");
+    this.setDialogue("Scrap Heap", "Tap Boot Up to begin.", "laptop");
     this.setBanner("OBSOLETE", 1.8);
-    this.updateStatus("Title Screen", "Press Enter to boot up.");
+    this.updateStatus("Title Screen", "Tap Boot Up to begin.");
     this.render();
   }
 
@@ -139,7 +139,7 @@ export class ObsoleteGame {
     if (this.mode === "title") {
       return {
         title: "Boot up and get your bearings.",
-        body: "Press Enter or click Boot Up to wake the laptop.",
+        body: "Tap Boot Up to wake the laptop.",
       };
     }
 
@@ -153,7 +153,7 @@ export class ObsoleteGame {
     if (this.mode === "cutscene") {
       return {
         title: "Watch the scene for your next goal.",
-        body: "Press Enter, E, or Space to advance dialogue when you're ready.",
+        body: "Tap ACT to advance dialogue when you're ready.",
       };
     }
 
@@ -966,7 +966,7 @@ export class ObsoleteGame {
     if (step.banner) {
       this.setBanner(step.banner, Math.max(this.cutscene.stepTimer, 1.2));
     }
-    this.updateStatus(this.act.label, step.hint || "Cutscene. Press Enter, E, or Space to advance.");
+    this.updateStatus(this.act.label, step.hint || "Cutscene. Tap ACT to advance.");
   }
 
   handleKeyDown(event) {
@@ -1048,6 +1048,41 @@ export class ObsoleteGame {
     if (movementAlias[key]) {
       this.keys.delete(movementAlias[key]);
     }
+  }
+
+  setVirtualDirection(direction, pressed) {
+    const keyMap = {
+      up: "arrowup",
+      down: "arrowdown",
+      left: "arrowleft",
+      right: "arrowright",
+    };
+    const key = keyMap[direction];
+    if (!key) return;
+    this.audio.unlock();
+    if (pressed) {
+      this.keys.add(key);
+      this.handleMiniGameInput(direction);
+    } else {
+      this.keys.delete(key);
+    }
+  }
+
+  triggerPrimaryAction() {
+    this.audio.unlock();
+    if (this.mode === "title") {
+      this.beginBoot();
+      return;
+    }
+    if (this.mode === "cutscene") {
+      this.advanceCutscene(true);
+      return;
+    }
+    if (this.mode === "win") {
+      this.reset();
+      return;
+    }
+    this.interact();
   }
 
   toggleFullscreen() {

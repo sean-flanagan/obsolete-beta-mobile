@@ -2,36 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Obsolete</title>
-    <script type="module" crossorigin src="/assets/index-C5-6aQM_.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-ByLskOLv.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Obsolete Mobile</title>
+    <script type="module" crossorigin src="/assets/index-BkwI0GH1.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BStaOvxR.css">
   </head>
   <body>
     <div class="page-noise"></div>
-    <main class="app-shell">
-      <header class="masthead">
-        <p class="masthead__eyebrow">2026 Vibe Coding Game Jam Prototype</p>
+    <main id="appShell" class="app-shell">
+      <header id="masthead" class="masthead">
+        <p class="masthead__eyebrow">Mobile Build</p>
         <h1>OBSOLETE</h1>
-        <p class="masthead__lede">
-          A stubborn 90s laptop wakes up in a junkyard and refuses to be sorted into
-          scrap. This version plays the same jam-scale story in a small Three.js
-          diorama.
-        </p>
+        <p class="masthead__lede">A touchscreen-ready portrait version of the junkyard escape.</p>
       </header>
 
-      <section class="cabinet" aria-label="Obsolete Three.js game cabinet">
+      <section class="cabinet" aria-label="Obsolete mobile game screen">
         <div class="cabinet__bezel">
           <div id="sceneMount" class="scene-mount" aria-label="Obsolete Three.js scene"></div>
           <div class="cabinet__glass"></div>
           <div class="cabinet__scanlines"></div>
 
           <div class="hud hud--top">
-            <div class="hud-card">
+            <div class="hud-card hud-card--memory">
               <p class="hud-card__label">Memory</p>
               <p id="memoryCount" class="hud-card__value">0/3 fragments</p>
             </div>
-            <div class="hud-card">
+            <div class="hud-card hud-card--battery">
               <p class="hud-card__label">Battery</p>
               <div id="batteryMeter" class="battery-meter" aria-label="Integrity meter">
                 <span class="battery-meter__cell"></span>
@@ -42,25 +38,19 @@
           </div>
 
           <section id="objectivePanel" class="objective-panel" aria-live="polite">
-            <p class="objective-panel__label">Current Goal</p>
+            <p class="objective-panel__label">Goal</p>
             <p id="objectiveTitle" class="objective-panel__title">Boot up and get your bearings.</p>
-            <p id="objectiveBody" class="objective-panel__body">Follow the hint to find the first powered machine.</p>
+            <p id="objectiveBody" class="objective-panel__body">Follow the marker and tap ACT near anything glowing.</p>
           </section>
 
           <div id="banner" class="banner is-hidden" aria-live="polite"></div>
 
           <section id="titleScreen" class="overlay overlay--center overlay--title">
-            <p class="overlay__eyebrow">Scrapyard Story</p>
+            <p class="overlay__eyebrow">Junkyard Escape</p>
             <h2>Obsolete</h2>
-            <p>
-              Escape the junk line, restore your power, and prove you still work.
-            </p>
-            <p class="overlay__loop-line">Recover power. Escape the scrap line. Prove you still work.</p>
+            <p class="overlay__copy">Recover power. Escape the line. Prove you still work.</p>
             <button id="startButton" class="game-button game-button--primary" type="button">Boot Up</button>
-            <p class="overlay__hint">
-              <code>WASD</code> / Arrow Keys move, <code>E</code> interacts,
-              <code>Enter</code> starts, <code>R</code> restarts.
-            </p>
+            <p class="overlay__hint">Tap ACT to advance scenes and interact. Use the pad to move.</p>
           </section>
 
           <section id="bootScreen" class="overlay overlay--boot is-hidden">
@@ -69,14 +59,11 @@
           </section>
 
           <section id="miniGamePanel" class="overlay overlay--panel is-hidden">
-            <p class="overlay__eyebrow">Utility Proof / POST</p>
+            <p class="overlay__eyebrow">Utility Proof</p>
             <h2 id="miniGameTitle">Diagnostic 1/3</h2>
             <p id="miniGameMessage" class="overlay__copy">Watch carefully.</p>
             <div id="miniGameKeys" class="mini-keys"></div>
-            <p class="overlay__hint">
-              Repeat the sequence with Arrow Keys or WASD. Three clean rounds opens the
-              final route.
-            </p>
+            <p class="overlay__hint">Repeat the pattern with the touch pad.</p>
           </section>
 
           <section id="winScreen" class="overlay overlay--center is-hidden">
@@ -88,45 +75,44 @@
 
           <section class="dialogue-panel">
             <p id="dialogueSpeaker" class="dialogue-panel__speaker">Scrap Heap</p>
-            <p id="dialogueText" class="dialogue-panel__text">Press Enter to boot up.</p>
-            <p id="interactionPrompt" class="dialogue-panel__prompt is-hidden">Move near something glowing and press E to interact.</p>
+            <p id="dialogueText" class="dialogue-panel__text">Tap Boot Up to begin.</p>
+            <p id="interactionPrompt" class="dialogue-panel__prompt is-hidden">Follow the beacon and tap ACT.</p>
           </section>
         </div>
 
         <div class="cabinet__status">
           <div>
-            <p class="status__label">Act</p>
+            <p class="status__label">Level</p>
             <p id="statusAct" class="status__value">Title Screen</p>
           </div>
           <div>
             <p class="status__label">Hint</p>
-            <p id="statusHint" class="status__value">Press Enter to boot up.</p>
+            <p id="statusHint" class="status__value">Tap Boot Up to begin.</p>
           </div>
         </div>
       </section>
 
-      <section class="info-grid">
+      <section id="touchControls" class="touch-controls is-hidden" aria-label="Touch controls">
+        <div class="touch-controls__pad">
+          <button class="touch-button touch-button--ghost touch-button--up" data-touch-direction="up" type="button">▲</button>
+          <button class="touch-button touch-button--ghost touch-button--left" data-touch-direction="left" type="button">◀</button>
+          <button class="touch-button touch-button--ghost touch-button--right" data-touch-direction="right" type="button">▶</button>
+          <button class="touch-button touch-button--ghost touch-button--down" data-touch-direction="down" type="button">▼</button>
+        </div>
+        <div class="touch-controls__actions">
+          <button id="touchAct" class="touch-button touch-button--primary" type="button">ACT</button>
+          <button id="touchRestart" class="touch-button touch-button--secondary" type="button">RESTART</button>
+        </div>
+      </section>
+
+      <section id="infoGrid" class="info-grid">
+        <article class="info-card">
+          <p class="info-card__label">Mobile Loop</p>
+          <p>Follow the beacon, tap ACT near key objects, and clear the final pattern test.</p>
+        </article>
         <article class="info-card">
           <p class="info-card__label">Controls</p>
-          <p>
-            <code>WASD</code> / Arrow Keys move, <code>E</code> interacts,
-            <code>Enter</code> starts or confirms, <code>R</code> restarts, and
-            <code>F</code> toggles fullscreen.
-          </p>
-        </article>
-        <article class="info-card">
-          <p class="info-card__label">Loop</p>
-          <p>
-            Boot up, push charge back into your body, survive the conveyor line, then
-            pass one final diagnostic.
-          </p>
-        </article>
-        <article class="info-card">
-          <p class="info-card__label">Look</p>
-          <p>
-            Low-poly scrap, warm dawn fog, CRT glass, chunky silhouettes, and small
-            synth beeps.
-          </p>
+          <p>Touch pad moves. ACT advances scenes, talks, and interacts. Restart resets the run.</p>
         </article>
       </section>
     </main>

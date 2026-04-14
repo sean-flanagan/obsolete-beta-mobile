@@ -1,9 +1,17 @@
 import { AudioSystem } from "./audio.js";
 import { ObsoleteGame } from "./game.js";
+import { getViewportProfile } from "./mobile-viewport.js";
 import { ObsoleteRenderer } from "./renderer.js";
 
 const sceneMount = document.getElementById("sceneMount");
 const ui = {
+  appShell: document.getElementById("appShell"),
+  masthead: document.getElementById("masthead"),
+  infoGrid: document.getElementById("infoGrid"),
+  touchControls: document.getElementById("touchControls"),
+  touchAct: document.getElementById("touchAct"),
+  touchRestart: document.getElementById("touchRestart"),
+  touchDirectionButtons: [...document.querySelectorAll("[data-touch-direction]")],
   statusAct: document.getElementById("statusAct"),
   statusHint: document.getElementById("statusHint"),
   memoryCount: document.getElementById("memoryCount"),
@@ -30,20 +38,61 @@ const ui = {
 
 const audio = new AudioSystem();
 const renderer = new ObsoleteRenderer({ mount: sceneMount });
-const game = new ObsoleteGame({
-  audio,
-  renderer,
-  ui,
-});
+const game = new ObsoleteGame({ audio, renderer, ui });
+
+const urlParams = new URLSearchParams(window.location.search);
+const forceMobile = urlParams.get("mobile") === "1";
+
+function applyViewportProfile() {
+  const profile = getViewportProfile({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    forceMobile,
+  });
+
+  document.body.dataset.viewport = profile.mode;
+  document.body.dataset.orientation = profile.isPortrait ? "portrait" : "landscape";
+  document.documentElement.style.setProperty("--scene-aspect-ratio", profile.sceneAspectRatio);
+  ui.infoGrid.classList.toggle("is-hidden", !profile.showSecondaryInfo);
+  ui.touchControls.classList.toggle("is-hidden", !profile.showTouchControls);
+  ui.masthead.classList.toggle("is-hidden", !profile.showMasthead);
+  ui.masthead.classList.toggle("masthead--compact", profile.compactTitle);
+}
+
+function bindDirectionButton(button) {
+  const direction = button.dataset.touchDirection;
+  const press = (event) => {
+    event.preventDefault();
+    game.setVirtualDirection(direction, true);
+    button.classList.add("is-active");
+  };
+  const release = (event) => {
+    event?.preventDefault?.();
+    game.setVirtualDirection(direction, false);
+    button.classList.remove("is-active");
+  };
+
+  button.addEventListener("pointerdown", press);
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
+}
 
 window.addEventListener("keydown", (event) => game.handleKeyDown(event));
 window.addEventListener("keyup", (event) => game.handleKeyUp(event));
-window.addEventListener("resize", () => renderer.handleResize());
+window.addEventListener("resize", () => {
+  applyViewportProfile();
+  renderer.handleResize();
+});
 
 ui.startButton.addEventListener("click", () => game.beginBoot());
 ui.restartButton.addEventListener("click", () => game.reset());
+ui.touchAct.addEventListener("click", () => game.triggerPrimaryAction());
+ui.touchRestart.addEventListener("click", () => game.reset());
+ui.touchDirectionButtons.forEach(bindDirectionButton);
 
 window.render_game_to_text = () => game.renderGameToText();
 window.advanceTime = (ms) => game.advanceTime(ms);
 
+applyViewportProfile();
 game.start();

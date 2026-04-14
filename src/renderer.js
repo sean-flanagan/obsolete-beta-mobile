@@ -258,7 +258,7 @@ export class ObsoleteRenderer {
     this.renderer.setSize(width, height, false);
 
     const aspect = width / height;
-    const viewSize = 12;
+    const viewSize = aspect < 0.75 ? 18 : 12;
     this.camera.left = -viewSize * aspect;
     this.camera.right = viewSize * aspect;
     this.camera.top = viewSize;
