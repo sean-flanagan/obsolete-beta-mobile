@@ -106,7 +106,7 @@ export class ObsoleteGame {
   }
 
   reset() {
-    this.mode = "title";
+    this.mode = this.startActIndex > 0 ? "play" : "title";
     this.bootIndex = 0;
     this.bootTimer = 0;
     this.endingTimer = 0;
@@ -128,6 +128,16 @@ export class ObsoleteGame {
     this.loadAct(this.startActIndex);
     this.camera.x = 0;
     this.camera.y = 0;
+
+    if (this.startActIndex > 0) {
+      this.setDialogue("Obsolete", this.act.introLine || "Still moving.", "laptop", 4.2);
+      this.setBanner(this.act.label.toUpperCase(), 1.6);
+      this.updateStatus(this.act.label, this.act.hint);
+      this.interactionFocus = this.getInteractionFocus();
+      this.render();
+      return;
+    }
+
     this.setDialogue("Scrap Heap", "Tap Boot Up to begin.", "laptop");
     this.setBanner("OBSOLETE", 1.8);
     this.updateStatus("Title Screen", "Tap Boot Up to begin.");
