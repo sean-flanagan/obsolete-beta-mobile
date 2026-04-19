@@ -501,6 +501,62 @@ code {
   display: none !important;
 }
 
+body[data-navigation-mode="graph"][data-viewport="mobile"] .hud,
+body[data-navigation-mode="graph"][data-viewport="mobile"] .cabinet__status {
+  display: none;
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .objective-panel {
+  top: 18px;
+  left: 18px;
+  right: auto;
+  width: min(248px, calc(100% - 36px));
+  padding: 8px 10px;
+  border-color: rgba(255, 245, 224, 0.28);
+  background: linear-gradient(180deg, rgba(255, 247, 232, 0.24), rgba(60, 69, 83, 0.56));
+  backdrop-filter: blur(10px);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .objective-panel__label,
+body[data-navigation-mode="graph"][data-viewport="mobile"] .objective-panel__body {
+  color: rgba(247, 233, 202, 0.84);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .objective-panel__title {
+  font-size: 0.92rem;
+  color: #fff5e7;
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .dialogue-panel {
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  padding: 10px 12px;
+  background: rgba(61, 68, 82, 0.58);
+  border-color: rgba(255, 245, 224, 0.18);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .touch-controls {
+  gap: 10px;
+  padding: 10px;
+  background: rgba(60, 69, 83, 0.42);
+  box-shadow: 0 14px 32px rgba(25, 29, 37, 0.2);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .touch-button--primary {
+  background: linear-gradient(180deg, #fff2d5, #edc88d);
+  box-shadow: 0 0 18px rgba(255, 228, 183, 0.18);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .touch-button--secondary {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body[data-navigation-mode="graph"][data-viewport="mobile"] .cabinet,
+body[data-navigation-mode="graph"][data-viewport="mobile"] .touch-controls {
+  border-color: rgba(255, 245, 224, 0.18);
+}
+
 body[data-viewport="desktop"] .app-shell {
   width: min(1180px, calc(100vw - 28px));
   margin: 22px auto 36px;

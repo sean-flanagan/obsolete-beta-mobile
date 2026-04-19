@@ -1414,6 +1414,8 @@ export class ObsoleteGame {
   updateUi() {
     const objective = this.getCurrentObjective();
     const graphTouchMode = this.isGraphAct() && this.mode !== "minigame";
+    document.body.dataset.navigationMode = this.act.navigationMode || "free";
+    document.body.dataset.gameMode = this.mode;
     this.ui.memoryCount.textContent = `${this.progress.fragments.length}/${MEMORY_FRAGMENTS.length} fragments`;
     this.ui.batteryCells.forEach((cell, index) => {
       cell.classList.toggle("is-active", index < this.progress.integrity);

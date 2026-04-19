@@ -938,24 +938,35 @@ export class ObsoleteRenderer {
   }
 
   applyPalette(game) {
-    const palette = game.mode === "ending" || game.mode === "win" ? PALETTES.dawn : PALETTES.yard;
+    const endingMode = game.mode === "ending" || game.mode === "win";
+    const graphMode = game.act?.navigationMode === "graph" && !endingMode;
+    const palette = endingMode
+      ? PALETTES.dawn
+      : graphMode
+        ? {
+            skyTop: "#5c6f8f",
+            skyBottom: "#d9c9b0",
+            lamp: "#ffe7bf",
+            accent: "#b8fff1",
+          }
+        : PALETTES.yard;
     this.scene.background = color(palette.skyTop);
     this.scene.fog.color.set(palette.skyBottom);
-    this.scene.fog.near = game.mode === "ending" || game.mode === "win" ? 20 : 14;
-    this.scene.fog.far = game.mode === "ending" || game.mode === "win" ? 72 : 54;
+    this.scene.fog.near = endingMode ? 20 : graphMode ? 16 : 14;
+    this.scene.fog.far = endingMode ? 72 : graphMode ? 64 : 54;
     this.ambientLight.color.set(palette.lamp);
-    this.ambientLight.groundColor.set(game.mode === "ending" || game.mode === "win" ? "#38444c" : "#182226");
-    this.ambientLight.intensity = game.mode === "ending" || game.mode === "win" ? 1.2 : 1.05;
+    this.ambientLight.groundColor.set(endingMode ? "#38444c" : graphMode ? "#4b5360" : "#182226");
+    this.ambientLight.intensity = endingMode ? 1.2 : graphMode ? 1.28 : 1.05;
     this.sunLight.color.set(palette.lamp);
-    this.sunLight.intensity = game.mode === "ending" || game.mode === "win" ? 1.35 : 1.55;
-    this.fillLight.color.set(game.mode === "ending" || game.mode === "win" ? "#bfd7ff" : "#7db8ff");
-    this.fillLight.intensity = game.mode === "ending" || game.mode === "win" ? 0.3 : 0.45;
+    this.sunLight.intensity = endingMode ? 1.35 : graphMode ? 1.12 : 1.55;
+    this.fillLight.color.set(endingMode ? "#bfd7ff" : graphMode ? "#f1d9ff" : "#7db8ff");
+    this.fillLight.intensity = endingMode ? 0.3 : graphMode ? 0.5 : 0.45;
     this.rimLight.color.set(palette.accent);
-    this.rimLight.intensity = game.mode === "ending" || game.mode === "win" ? 0.75 : 1.05;
+    this.rimLight.intensity = endingMode ? 0.75 : graphMode ? 1.18 : 1.05;
     this.heroLight.color.set(palette.accent);
-    this.floorGlow.material.opacity = game.mode === "ending" || game.mode === "win" ? 0.16 : 0.18;
+    this.floorGlow.material.opacity = endingMode ? 0.16 : graphMode ? 0.22 : 0.18;
     this.heroLightGlow.material.color.set(palette.accent);
-    this.sunHalo.material.opacity = game.mode === "ending" || game.mode === "win" ? 0.12 : 0.08;
+    this.sunHalo.material.opacity = endingMode ? 0.12 : graphMode ? 0.12 : 0.08;
   }
 
   clearGroup(group) {
