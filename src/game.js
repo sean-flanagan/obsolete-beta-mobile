@@ -1413,6 +1413,7 @@ export class ObsoleteGame {
 
   updateUi() {
     const objective = this.getCurrentObjective();
+    const graphTouchMode = this.isGraphAct() && this.mode !== "minigame";
     this.ui.memoryCount.textContent = `${this.progress.fragments.length}/${MEMORY_FRAGMENTS.length} fragments`;
     this.ui.batteryCells.forEach((cell, index) => {
       cell.classList.toggle("is-active", index < this.progress.integrity);
@@ -1422,6 +1423,9 @@ export class ObsoleteGame {
     this.ui.dialogueText.textContent = this.dialogue.text;
     this.ui.objectiveTitle.textContent = objective.title;
     this.ui.objectiveBody.textContent = objective.body;
+    this.ui.touchPad.classList.toggle("is-hidden", graphTouchMode);
+    this.ui.touchGestureHint.classList.toggle("is-hidden", !graphTouchMode);
+    this.ui.touchControls.classList.toggle("touch-controls--tap-only", graphTouchMode);
 
     const prompt = this.mode === "play" ? this.interactionFocus?.label || "" : "";
     this.ui.interactionPrompt.textContent = prompt;

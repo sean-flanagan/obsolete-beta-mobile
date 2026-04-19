@@ -425,6 +425,10 @@ select {
   background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(9,14,18,0.88));
 }
 
+.touch-controls--tap-only {
+  grid-template-columns: 1fr;
+}
+
 .touch-controls__pad {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -457,6 +461,21 @@ select {
   display: grid;
   grid-template-rows: 1fr auto;
   gap: 8px;
+}
+
+.touch-controls--tap-only .touch-controls__actions {
+  grid-template-rows: auto 1fr auto;
+}
+
+.touch-controls__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(142, 255, 211, 0.14);
+  background: rgba(142, 255, 211, 0.08);
+  color: #d7fff2;
+  line-height: 1.4;
+  font-size: 0.9rem;
 }
 
 .touch-button--primary {

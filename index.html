@@ -92,13 +92,14 @@
       </section>
 
       <section id="touchControls" class="touch-controls is-hidden" aria-label="Touch controls">
-        <div class="touch-controls__pad">
+        <div id="touchPad" class="touch-controls__pad">
           <button class="touch-button touch-button--ghost touch-button--up" data-touch-direction="up" type="button">▲</button>
           <button class="touch-button touch-button--ghost touch-button--left" data-touch-direction="left" type="button">◀</button>
           <button class="touch-button touch-button--ghost touch-button--right" data-touch-direction="right" type="button">▶</button>
           <button class="touch-button touch-button--ghost touch-button--down" data-touch-direction="down" type="button">▼</button>
         </div>
         <div class="touch-controls__actions">
+          <p id="touchGestureHint" class="touch-controls__hint is-hidden">Tap the path to move. Tap ACT near anything you want to turn or inspect.</p>
           <button id="touchAct" class="touch-button touch-button--primary" type="button">ACT</button>
           <button id="touchRestart" class="touch-button touch-button--secondary" type="button">RESTART</button>
         </div>

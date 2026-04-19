@@ -9,6 +9,8 @@ const ui = {
   masthead: document.getElementById("masthead"),
   infoGrid: document.getElementById("infoGrid"),
   touchControls: document.getElementById("touchControls"),
+  touchPad: document.getElementById("touchPad"),
+  touchGestureHint: document.getElementById("touchGestureHint"),
   touchAct: document.getElementById("touchAct"),
   touchRestart: document.getElementById("touchRestart"),
   touchDirectionButtons: [...document.querySelectorAll("[data-touch-direction]")],
