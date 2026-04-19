@@ -38,10 +38,13 @@ const ui = {
 
 const audio = new AudioSystem();
 const renderer = new ObsoleteRenderer({ mount: sceneMount });
-const game = new ObsoleteGame({ audio, renderer, ui });
 
 const urlParams = new URLSearchParams(window.location.search);
 const forceMobile = urlParams.get("mobile") === "1";
+const requestedAct = Number.parseInt(urlParams.get("act") || "", 10);
+const startActIndex = Number.isInteger(requestedAct) && requestedAct >= 1 ? requestedAct - 1 : 0;
+
+const game = new ObsoleteGame({ audio, renderer, ui, startActIndex });
 
 function applyViewportProfile() {
   const profile = getViewportProfile({
@@ -78,6 +81,13 @@ function bindDirectionButton(button) {
   button.addEventListener("pointerleave", release);
 }
 
+sceneMount.addEventListener("pointerdown", (event) => {
+  const worldPoint = renderer.getWorldPointFromClient(event.clientX, event.clientY);
+  if (worldPoint) {
+    game.handleSceneTap(worldPoint);
+  }
+});
+
 window.addEventListener("keydown", (event) => game.handleKeyDown(event));
 window.addEventListener("keyup", (event) => game.handleKeyUp(event));
 window.addEventListener("resize", () => {
@@ -93,6 +103,7 @@ ui.touchDirectionButtons.forEach(bindDirectionButton);
 
 window.render_game_to_text = () => game.renderGameToText();
 window.advanceTime = (ms) => game.advanceTime(ms);
+window.tapSceneWorld = (x, y) => game.handleSceneTap({ x, y });
 
 applyViewportProfile();
 game.start();

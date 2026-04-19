@@ -1,10 +1,13 @@
 import { ACTS, BOOT_LINES, CUTSCENES, MEMORY_FRAGMENTS } from "./levels.js";
+import { findNodePath, getNodeById } from "./level-graph.js";
 import { getObjectiveFocus } from "./objective-focus.js";
 
 const WIDTH = 960;
 const HEIGHT = 540;
 const PLAYER_SPEED = 220;
+const GRAPH_MOVE_SPEED = 220;
 const INTERACT_RANGE = 80;
+const TAP_NODE_RADIUS = 72;
 const MAX_INTEGRITY = 3;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -23,10 +26,11 @@ const centerOf = (entity) => ({
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
 export class ObsoleteGame {
-  constructor({ audio, renderer, ui }) {
+  constructor({ audio, renderer, ui, startActIndex = 0 }) {
     this.audio = audio;
     this.renderer = renderer;
     this.ui = ui;
+    this.startActIndex = clamp(startActIndex, 0, ACTS.length - 1);
     this.keys = new Set();
     this.lastTimestamp = 0;
     this.time = 0;
@@ -40,6 +44,9 @@ export class ObsoleteGame {
     this.scheduledEvents = [];
     this.cutscene = null;
     this.interactionFocus = null;
+    this.structureState = {};
+    this.structureTransition = null;
+    this.pathState = this.createPathState();
 
     this.player = {
       x: 0,
@@ -89,6 +96,15 @@ export class ObsoleteGame {
     };
   }
 
+  createPathState() {
+    return {
+      currentNodeId: null,
+      targetNodeId: null,
+      path: [],
+      isAutoMoving: false,
+    };
+  }
+
   reset() {
     this.mode = "title";
     this.bootIndex = 0;
@@ -103,10 +119,13 @@ export class ObsoleteGame {
     this.scheduledEvents = [];
     this.cutscene = null;
     this.interactionFocus = null;
+    this.structureState = {};
+    this.structureTransition = null;
+    this.pathState = this.createPathState();
     this.progress = this.createProgress();
     this.player.mood = "curious";
     this.miniGame = this.createMiniGameState();
-    this.loadAct(0);
+    this.loadAct(this.startActIndex);
     this.camera.x = 0;
     this.camera.y = 0;
     this.setDialogue("Scrap Heap", "Tap Boot Up to begin.", "laptop");
@@ -118,6 +137,9 @@ export class ObsoleteGame {
   loadAct(index) {
     this.actIndex = index;
     this.act = deepClone(ACTS[index]);
+    this.structureState = deepClone(this.act.structureStates || {});
+    this.structureTransition = null;
+    this.pathState = this.createPathState();
     this.player.x = this.act.start.x;
     this.player.y = this.act.start.y;
     this.activeCheckpoint = {
@@ -125,6 +147,15 @@ export class ObsoleteGame {
       y: this.act.checkpoint.y,
       label: this.act.checkpoint.label,
     };
+
+    if (this.act.navigationMode === "graph" && this.act.startNodeId) {
+      const startNode = getNodeById(this.act, this.act.startNodeId);
+      if (startNode) {
+        this.pathState.currentNodeId = startNode.id;
+        this.player.x = startNode.x - this.player.w / 2;
+        this.player.y = startNode.y - this.player.h / 2;
+      }
+    }
     this.updateStatus(this.act.label, this.act.hint);
     this.setBanner(this.act.label.toUpperCase(), 2.4);
     this.renderer.markDirty();
@@ -133,6 +164,187 @@ export class ObsoleteGame {
   updateStatus(act, hint) {
     this.ui.statusAct.textContent = act;
     this.ui.statusHint.textContent = hint;
+  }
+
+  getNodeScreenPosition(nodeId) {
+    const node = getNodeById(this.act, nodeId);
+    if (!node) {
+      return null;
+    }
+
+    return {
+      x: node.x,
+      y: node.y,
+    };
+  }
+
+  getCurrentNode() {
+    return getNodeById(this.act, this.pathState.currentNodeId);
+  }
+
+  setPlayerToNode(nodeId) {
+    const node = getNodeById(this.act, nodeId);
+    if (!node) {
+      return;
+    }
+
+    this.pathState.currentNodeId = node.id;
+    this.player.x = node.x - this.player.w / 2;
+    this.player.y = node.y - this.player.h / 2;
+  }
+
+  isGraphAct() {
+    return this.act?.navigationMode === "graph";
+  }
+
+  handleSceneTap(worldPoint) {
+    if (this.mode !== "play") {
+      return;
+    }
+
+    if (!this.isGraphAct()) {
+      return;
+    }
+
+    const tappedInteractor = this.findTappedInteractor(worldPoint);
+    if (tappedInteractor) {
+      this.activateInteractor(tappedInteractor);
+      return;
+    }
+
+    const tappedNode = this.findTappedNode(worldPoint);
+    if (tappedNode) {
+      this.beginAutoMove(tappedNode.id);
+    }
+  }
+
+  findTappedInteractor(worldPoint) {
+    return (this.act.interactors || []).find((interactor) => {
+      const radius = interactor.radius || TAP_NODE_RADIUS;
+      return Math.hypot(worldPoint.x - interactor.x, worldPoint.y - interactor.y) <= radius;
+    }) || null;
+  }
+
+  findTappedNode(worldPoint) {
+    return (this.act.nodes || []).find((node) => Math.hypot(worldPoint.x - node.x, worldPoint.y - node.y) <= TAP_NODE_RADIUS) || null;
+  }
+
+  beginAutoMove(targetNodeId) {
+    if (!this.isGraphAct()) {
+      return false;
+    }
+
+    const startNodeId = this.pathState.currentNodeId;
+    const path = findNodePath(this.act, startNodeId, targetNodeId, this.structureState);
+    if (!path.length) {
+      this.audio.error();
+      this.setDialogue("Obsolete", "That path is still sleeping.", "laptop", 2.6);
+      return false;
+    }
+
+    this.pathState.targetNodeId = targetNodeId;
+    this.pathState.path = path.slice(1);
+    this.pathState.isAutoMoving = this.pathState.path.length > 0;
+    if (this.pathState.isAutoMoving) {
+      this.audio.interact();
+    }
+    return this.pathState.isAutoMoving;
+  }
+
+  updateGraphMovement(delta) {
+    if (!this.pathState.isAutoMoving || !this.pathState.path.length) {
+      return;
+    }
+
+    const nextNode = getNodeById(this.act, this.pathState.path[0]);
+    if (!nextNode) {
+      this.pathState = this.createPathState();
+      return;
+    }
+
+    const nextX = nextNode.x - this.player.w / 2;
+    const nextY = nextNode.y - this.player.h / 2;
+    const dx = nextX - this.player.x;
+    const dy = nextY - this.player.y;
+    const distance = Math.hypot(dx, dy);
+    const step = GRAPH_MOVE_SPEED * delta;
+
+    if (distance <= step) {
+      this.player.x = nextX;
+      this.player.y = nextY;
+      this.pathState.currentNodeId = nextNode.id;
+      this.pathState.path.shift();
+      this.pathState.isAutoMoving = this.pathState.path.length > 0;
+      if (!this.pathState.isAutoMoving) {
+        this.pathState.targetNodeId = null;
+      }
+      return;
+    }
+
+    this.player.x += (dx / distance) * step;
+    this.player.y += (dy / distance) * step;
+    if (dx !== 0) {
+      this.player.facing = dx > 0 ? 1 : -1;
+    }
+    this.audio.step(this.time * 1000);
+  }
+
+  activateInteractor(interactor) {
+    if (!interactor?.target) {
+      return;
+    }
+
+    const cycle = interactor.cycle || [];
+    if (!cycle.length) {
+      return;
+    }
+
+    const currentValue = this.structureState[interactor.target];
+    const currentIndex = Math.max(0, cycle.indexOf(currentValue));
+    const nextValue = cycle[(currentIndex + 1) % cycle.length];
+    this.structureState[interactor.target] = nextValue;
+    this.structureTransition = {
+      id: interactor.target,
+      from: currentValue,
+      to: nextValue,
+      timer: 0,
+      duration: 0.6,
+    };
+    this.pathState.path = [];
+    this.pathState.targetNodeId = null;
+    this.pathState.isAutoMoving = false;
+    this.audio.success();
+    this.setBanner("PATH REALIGNED", 1.2);
+    this.setDialogue("Wise Old Modem", "There. The bridge remembers a different direction.", "modem", 3.2);
+    this.interactionFocus = this.getInteractionFocus();
+  }
+
+  updateStructureTransition(delta) {
+    if (!this.structureTransition) {
+      return;
+    }
+
+    this.structureTransition.timer += delta;
+    if (this.structureTransition.timer >= this.structureTransition.duration) {
+      this.structureTransition = null;
+    }
+  }
+
+  getStructureAngle(structureId) {
+    const stateValue = this.structureState[structureId];
+    const structure = (this.act.structures || []).find((entry) => entry.id === structureId);
+    const stateAngles = structure?.stateAngles || { east: 0, north: Math.PI / 2, south: -Math.PI / 2, west: Math.PI };
+    const currentAngle = stateAngles[stateValue] ?? 0;
+
+    if (!this.structureTransition || this.structureTransition.id !== structureId) {
+      return currentAngle;
+    }
+
+    const progress = clamp(this.structureTransition.timer / this.structureTransition.duration, 0, 1);
+    const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    const fromAngle = stateAngles[this.structureTransition.from] ?? currentAngle;
+    const toAngle = stateAngles[this.structureTransition.to] ?? currentAngle;
+    return fromAngle + (toAngle - fromAngle) * eased;
   }
 
   getCurrentObjective() {
@@ -178,6 +390,16 @@ export class ObsoleteGame {
       return {
         title: "You escaped.",
         body: "Press Play Again or R to restart the prototype.",
+      };
+    }
+
+    if (this.isGraphAct()) {
+      return {
+        title: this.act.title || "Touch the path into place.",
+        body:
+          this.interactionFocus?.type === "interactor"
+            ? this.interactionFocus.label
+            : this.act.hint || "Tap a glowing node to walk. Tap the spindle to rotate the bridge.",
       };
     }
 
@@ -230,6 +452,45 @@ export class ObsoleteGame {
 
   getInteractionFocus() {
     if (this.mode !== "play") return null;
+
+    if (this.isGraphAct()) {
+      const currentNode = this.getCurrentNode();
+      const nearbyInteractor = (this.act.interactors || []).find((interactor) => {
+        if (!currentNode) {
+          return false;
+        }
+        return Math.hypot(currentNode.x - interactor.x, currentNode.y - interactor.y) <= (interactor.radius || 120);
+      });
+
+      if (nearbyInteractor) {
+        return {
+          type: "interactor",
+          x: nearbyInteractor.x - 34,
+          y: nearbyInteractor.y - 34,
+          w: 68,
+          h: 68,
+          label: nearbyInteractor.label,
+          tone: "guide",
+          highlightStyle: "beacon",
+        };
+      }
+
+      const goalNode = (this.act.nodes || []).find((node) => node.kind === "goal");
+      if (goalNode) {
+        return {
+          type: "goal",
+          x: goalNode.x - 30,
+          y: goalNode.y - 30,
+          w: 60,
+          h: 60,
+          label: this.pathState.currentNodeId === goalNode.id ? "Step into the modem shrine" : "Align the bridge to reach the shrine",
+          tone: "exit",
+          highlightStyle: "beam",
+        };
+      }
+
+      return null;
+    }
 
     const nearestNpc = this.findNearest(this.act.npcs || []);
     if (nearestNpc) {
@@ -335,6 +596,7 @@ export class ObsoleteGame {
   advance(delta) {
     this.time += delta;
     this.tickScheduledEvents(delta);
+    this.updateStructureTransition(delta);
 
     if (this.flash > 0) this.flash = Math.max(0, this.flash - delta * 2.4);
     if (this.glitch > 0) this.glitch = Math.max(0, this.glitch - delta * 1.8);
@@ -401,7 +663,11 @@ export class ObsoleteGame {
         this.setBanner("BOOT COMPLETE", 1.6);
         this.setDialogue("Obsolete", "Okay. I am alive. That seems important.", "laptop", 5.5);
         this.updateStatus(this.act.label, this.act.hint);
-        this.startCutscene("act1Wake");
+        if (this.act.enterCutscene) {
+          this.startCutscene(this.act.enterCutscene);
+        } else if (this.actIndex === 0) {
+          this.startCutscene("act1Wake");
+        }
       }
     }
   }
@@ -416,6 +682,14 @@ export class ObsoleteGame {
   }
 
   updatePlay(delta) {
+    if (this.isGraphAct()) {
+      this.updateGraphMovement(delta);
+      this.updateCamera(delta);
+      this.checkActInteractions();
+      this.interactionFocus = this.getInteractionFocus();
+      return;
+    }
+
     const axisX =
       (this.isDown("arrowright") || this.isDown("d") ? 1 : 0) -
       (this.isDown("arrowleft") || this.isDown("a") ? 1 : 0);
@@ -489,6 +763,21 @@ export class ObsoleteGame {
       const targetY = clamp(this.cutscene.focus.y - HEIGHT / 2, 0, this.act.world.height - HEIGHT);
       this.camera.x += (targetX - this.camera.x) * Math.min(1, delta * 3.8);
       this.camera.y += (targetY - this.camera.y) * Math.min(1, delta * 3.8);
+      return;
+    }
+
+    if (this.isGraphAct() && this.act.cameraRig?.mode === "anchored") {
+      const rig = this.act.cameraRig;
+      const focus = rig.focus || { x: this.act.world.width / 2, y: this.act.world.height / 2 };
+      const deadZone = rig.deadZone || 96;
+      const followStrength = rig.followStrength || 0.18;
+      const playerCenter = centerOf(this.player);
+      const driftX = clamp(playerCenter.x - focus.x, -deadZone, deadZone) * followStrength;
+      const driftY = clamp(playerCenter.y - focus.y, -deadZone, deadZone) * followStrength;
+      const targetX = clamp(focus.x + driftX - WIDTH / 2, 0, Math.max(0, this.act.world.width - WIDTH));
+      const targetY = clamp(focus.y + driftY - HEIGHT / 2, 0, Math.max(0, this.act.world.height - HEIGHT));
+      this.camera.x += (targetX - this.camera.x) * Math.min(1, delta * 4.2);
+      this.camera.y += (targetY - this.camera.y) * Math.min(1, delta * 4.2);
       return;
     }
 
@@ -756,6 +1045,20 @@ export class ObsoleteGame {
     }
 
     this.audio.interact();
+
+    if (this.isGraphAct()) {
+      const currentNode = this.getCurrentNode();
+      const nearbyInteractor = (this.act.interactors || []).find((interactor) => {
+        if (!currentNode) {
+          return false;
+        }
+        return Math.hypot(currentNode.x - interactor.x, currentNode.y - interactor.y) <= (interactor.radius || 120);
+      });
+      if (nearbyInteractor) {
+        this.activateInteractor(nearbyInteractor);
+        return;
+      }
+    }
 
     const targetNpc = this.findNearest(this.act.npcs || []);
     if (targetNpc) {
@@ -1176,6 +1479,15 @@ export class ObsoleteGame {
         act2GateOpen: this.progress.act2GateOpen,
         diagnosticPassed: this.progress.diagnosticPassed,
       },
+      navigationMode: this.act.navigationMode || "free",
+      pathState: this.isGraphAct()
+        ? {
+            currentNodeId: this.pathState.currentNodeId,
+            targetNodeId: this.pathState.targetNodeId,
+            remainingPath: [...this.pathState.path],
+            structureState: { ...this.structureState },
+          }
+        : null,
       checkpoint: this.activeCheckpoint,
       fragments: this.progress.fragments.length,
       nearbyNpcs: (this.act.npcs || []).map((npc) => ({

@@ -36,6 +36,10 @@ export class ObsoleteRenderer {
     this.camera = new THREE.OrthographicCamera(-14, 14, 8, -8, 0.1, 200);
     this.camera.position.set(0, 18, 16);
     this.camera.lookAt(0, 0, 0);
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2();
+    this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this.rayIntersection = new THREE.Vector3();
 
     this.worldRoot = new THREE.Group();
     this.fxRoot = new THREE.Group();
@@ -234,6 +238,10 @@ export class ObsoleteRenderer {
       decor: [],
       conveyors: [],
       endingScrap: [],
+      graphNodes: [],
+      graphEdges: [],
+      graphInteractors: [],
+      graphStructures: [],
     };
 
     this.scene.add(this.dynamic.player.group);
@@ -266,6 +274,25 @@ export class ObsoleteRenderer {
     this.camera.updateProjectionMatrix();
   }
 
+  getWorldPointFromClient(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return null;
+    }
+
+    this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    if (!this.raycaster.ray.intersectPlane(this.groundPlane, this.rayIntersection)) {
+      return null;
+    }
+
+    return {
+      x: this.toGameX(this.rayIntersection.x),
+      y: this.toGameY(this.rayIntersection.z),
+    };
+  }
+
   sync(game) {
     const worldKey = `${game.mode}:${game.mode === "ending" || game.mode === "win" ? "escape" : game.act.id}`;
     if (this.needsWorldRebuild || worldKey !== this.currentWorldKey) {
@@ -292,6 +319,10 @@ export class ObsoleteRenderer {
     this.dynamic.decor = [];
     this.dynamic.conveyors = [];
     this.dynamic.endingScrap = [];
+    this.dynamic.graphNodes = [];
+    this.dynamic.graphEdges = [];
+    this.dynamic.graphInteractors = [];
+    this.dynamic.graphStructures = [];
 
     if (game.mode === "ending" || game.mode === "win") {
       this.buildEndingWorld();
@@ -303,6 +334,12 @@ export class ObsoleteRenderer {
 
   buildActWorld(game) {
     this.world = { ...game.act.world };
+
+    if (game.act.navigationMode === "graph") {
+      this.buildGraphWorld(game);
+      return;
+    }
+
     const palette = PALETTES.yard;
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(
@@ -392,6 +429,106 @@ export class ObsoleteRenderer {
     this.worldRoot.add(this.dynamic.exitArch, this.dynamic.checkpoint);
   }
 
+  buildGraphWorld(game) {
+    const palette = PALETTES.yard;
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(game.act.world.width / WORLD_SCALE, game.act.world.height / WORLD_SCALE),
+      new THREE.MeshStandardMaterial({
+        color: "#212830",
+        roughness: 0.96,
+        metalness: 0.08,
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    this.worldRoot.add(floor);
+
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(6.6, 7.4, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color: "#2e3943", roughness: 0.88, metalness: 0.14 })
+    );
+    plinth.position.set(this.toWorldX(490), -0.56, this.toWorldZ(760));
+    this.worldRoot.add(plinth);
+
+    const shrineBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.55, 1.9, 0.5, 8),
+      new THREE.MeshStandardMaterial({ color: "#3f4d59", roughness: 0.86, metalness: 0.16 })
+    );
+    shrineBase.position.set(this.toWorldX(490), 0.25, this.toWorldZ(260));
+    this.worldRoot.add(shrineBase);
+
+    const nodeMaterial = new THREE.MeshBasicMaterial({ color: palette.screen, transparent: true, opacity: 0.9 });
+    for (const node of game.act.nodes || []) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(node.kind === "goal" ? 0.42 : 0.28, node.kind === "goal" ? 0.72 : 0.5, 32),
+        nodeMaterial.clone()
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(this.toWorldX(node.x), 0.08, this.toWorldZ(node.y));
+      ring.userData.nodeId = node.id;
+      this.worldRoot.add(ring);
+      this.dynamic.graphNodes.push(ring);
+    }
+
+    for (const edge of game.act.edges || []) {
+      const fromNode = (game.act.nodes || []).find((node) => node.id === edge.from);
+      const toNode = (game.act.nodes || []).find((node) => node.id === edge.to);
+      if (!fromNode || !toNode) {
+        continue;
+      }
+      const dx = toNode.x - fromNode.x;
+      const dy = toNode.y - fromNode.y;
+      const length = Math.hypot(dx, dy) / WORLD_SCALE;
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.06, Math.max(0.24, length)),
+        new THREE.MeshBasicMaterial({ color: "#32404b", transparent: true, opacity: 0.7 })
+      );
+      strip.position.set(this.toWorldX((fromNode.x + toNode.x) / 2), 0.05, this.toWorldZ((fromNode.y + toNode.y) / 2));
+      strip.rotation.y = Math.atan2(dx, dy);
+      strip.userData = { edge };
+      this.worldRoot.add(strip);
+      this.dynamic.graphEdges.push(strip);
+    }
+
+    for (const interactor of game.act.interactors || []) {
+      const pedestal = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.42, 0.34, 18),
+        new THREE.MeshStandardMaterial({ color: "#ffb768", roughness: 0.46, metalness: 0.2 })
+      );
+      pedestal.position.set(this.toWorldX(interactor.x), 0.28, this.toWorldZ(interactor.y));
+      pedestal.userData = { interactorId: interactor.id };
+      this.worldRoot.add(pedestal);
+      this.dynamic.graphInteractors.push(pedestal);
+    }
+
+    for (const structure of game.act.structures || []) {
+      if (structure.type !== "rotating-bridge") {
+        continue;
+      }
+      const group = new THREE.Group();
+      const bridge = new THREE.Mesh(
+        new THREE.BoxGeometry(0.48, 0.18, (structure.span || 220) / WORLD_SCALE),
+        new THREE.MeshStandardMaterial({ color: "#d9d8cf", roughness: 0.72, metalness: 0.2 })
+      );
+      bridge.position.y = structure.baseHeight || 1.2;
+      const spine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.16, 1.6, 20),
+        new THREE.MeshStandardMaterial({ color: "#5e7283", roughness: 0.58, metalness: 0.22 })
+      );
+      spine.position.y = 0.8;
+      group.add(bridge, spine);
+      group.position.set(this.toWorldX(structure.x), 0, this.toWorldZ(structure.y));
+      group.userData = { structureId: structure.id, bridge };
+      this.worldRoot.add(group);
+      this.dynamic.graphStructures.push(group);
+    }
+
+    for (const npc of game.act.npcs || []) {
+      const model = this.createNpc(npc);
+      this.worldRoot.add(model.group);
+      this.dynamic.npcs.push({ model, source: npc });
+    }
+  }
+
   buildEndingWorld() {
     this.world = { width: 2400, height: 920 };
     const skyPlane = new THREE.Mesh(
@@ -449,15 +586,16 @@ export class ObsoleteRenderer {
     const playerZ = this.toWorldZ(game.player.y + game.player.h / 2);
     const titleMode = game.mode === "title";
     const bootMode = game.mode === "boot";
+    const graphMode = game.act?.navigationMode === "graph" && !titleMode && !bootMode;
     const targetX = titleMode ? playerX + 3.4 : this.toWorldX(game.camera.x + VIEW_WIDTH / 2);
     const targetZ = titleMode ? playerZ - 0.6 : this.toWorldZ(game.camera.y + VIEW_HEIGHT / 2);
-    const y = game.mode === "ending" || game.mode === "win" ? 17 : titleMode ? 15.6 : bootMode ? 16.2 : 18;
-    const cameraOffsetX = titleMode ? -6.2 : bootMode ? -5.1 : -4;
-    const cameraOffsetZ = titleMode ? 11.4 : bootMode ? 11.9 : 13;
+    const y = game.mode === "ending" || game.mode === "win" ? 17 : titleMode ? 15.6 : bootMode ? 16.2 : graphMode ? 19.5 : 18;
+    const cameraOffsetX = titleMode ? -6.2 : bootMode ? -5.1 : graphMode ? -3.1 : -4;
+    const cameraOffsetZ = titleMode ? 11.4 : bootMode ? 11.9 : graphMode ? 11.6 : 13;
     const bootSwayX = bootMode ? Math.sin(game.time * 8.5) * (0.12 + game.powerSurge * 0.18) : 0;
     const bootSwayZ = bootMode ? Math.cos(game.time * 6.2) * 0.16 : 0;
     this.camera.position.set(targetX + cameraOffsetX + bootSwayX, y, targetZ + cameraOffsetZ + bootSwayZ);
-    this.camera.lookAt(targetX, titleMode ? 0.75 : bootMode ? 0.42 : 0, targetZ);
+    this.camera.lookAt(targetX, titleMode ? 0.75 : bootMode ? 0.42 : graphMode ? 0.62 : 0, targetZ);
     this.floorGlow.material.color.set(palette.lamp);
     this.floorGlow.position.set(titleMode ? playerX + 0.25 : targetX, 0.02, titleMode ? playerZ : targetZ);
     this.sunHalo.material.color.set(palette.lamp);
@@ -470,6 +608,36 @@ export class ObsoleteRenderer {
     const playerZ = this.toWorldZ(game.player.y + game.player.h / 2);
     const titleMode = game.mode === "title";
     const bootMode = game.mode === "boot";
+
+    if (game.act?.navigationMode === "graph") {
+      this.dynamic.graphNodes.forEach((ring) => {
+        const node = (game.act.nodes || []).find((entry) => entry.id === ring.userData.nodeId);
+        const active = game.pathState.currentNodeId === node?.id || game.pathState.targetNodeId === node?.id;
+        ring.material.color.set(node?.kind === "goal" ? "#fff0b8" : active ? "#bafff0" : "#8effd3");
+        ring.material.opacity = node?.kind === "goal" ? 0.95 : active ? 0.92 : 0.55;
+        const scale = node?.kind === "goal" ? 1.06 + pulse * 0.08 : active ? 1.08 : 1;
+        ring.scale.setScalar(scale);
+      });
+
+      this.dynamic.graphEdges.forEach((strip) => {
+        const edge = strip.userData.edge;
+        const enabled = !edge.requiresState || Object.entries(edge.requiresState).every(([key, value]) => game.structureState[key] === value);
+        strip.material.color.set(enabled ? "#d4fff3" : "#32404b");
+        strip.material.opacity = enabled ? 0.88 : 0.2;
+      });
+
+      this.dynamic.graphInteractors.forEach((pedestal) => {
+        pedestal.material.emissive = pedestal.material.emissive || new THREE.Color("#000000");
+        pedestal.material.emissive.set("#ffb768");
+        pedestal.material.emissiveIntensity = 0.2 + pulse * 0.22;
+        pedestal.scale.setScalar(game.interactionFocus?.type === "interactor" ? 1.08 : 1);
+      });
+
+      this.dynamic.graphStructures.forEach((group) => {
+        group.rotation.y = game.getStructureAngle(group.userData.structureId);
+      });
+    }
+
     this.heroLight.position.set(playerX + (titleMode ? 0.15 : 0.3), game.mode === "ending" || game.mode === "win" ? 2.6 : titleMode ? 2.75 : 2.2, playerZ + (titleMode ? -0.05 : 0.15));
     this.heroLightGlow.position.set(playerX + (titleMode ? 0.05 : 0.15), 0.03, playerZ + (titleMode ? -0.04 : 0.05));
     this.heroLight.intensity =
@@ -1625,5 +1793,13 @@ export class ObsoleteRenderer {
 
   toWorldZ(y) {
     return (y - this.world.height / 2) / WORLD_SCALE;
+  }
+
+  toGameX(worldX) {
+    return worldX * WORLD_SCALE + this.world.width / 2;
+  }
+
+  toGameY(worldZ) {
+    return worldZ * WORLD_SCALE + this.world.height / 2;
   }
 }
